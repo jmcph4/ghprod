@@ -1,12 +1,10 @@
 use std::{error::Error, fmt};
 
-use ethers::prelude::ProviderError; /* TODO: remove */
-
 pub const ERROR_CLIENT_INIT: u8 = 1u8;
 
 #[derive(Debug)]
 pub enum InnerGhProdError {
-    ClientError(ProviderError),
+    ClientError(octocrab::Error),
 }
 
 impl fmt::Display for InnerGhProdError {
@@ -47,8 +45,8 @@ impl Error for GhProdError {
     }
 }
 
-impl From<ProviderError> for GhProdError {
-    fn from(value: ProviderError) -> Self {
+impl From<octocrab::Error> for GhProdError {
+    fn from(value: octocrab::Error) -> Self {
         Self::new(
             ERROR_CLIENT_INIT,
             "Failed to initialise client".to_string(),
