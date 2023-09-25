@@ -7,6 +7,7 @@ use octocrab::models::pulls::PullRequest;
 pub enum Metric {
     MeanPrDuration,
     MedianPrDuration,
+    MeanNetChange,
 }
 
 impl FromStr for Metric {
@@ -16,6 +17,7 @@ impl FromStr for Metric {
         match s {
             "mean_pr_duration" => Ok(Self::MeanPrDuration),
             "median_pr_duration" => Ok(Self::MedianPrDuration),
+            "mean_net_change" => Ok(Self::MeanNetChange),
             _ => Err("Unknown metric"),
         }
     }
@@ -135,5 +137,40 @@ pub fn median_pr_duration(
         } else {
             durations[(n + 1) / 2]
         })
+    }
+}
+
+#[allow(dead_code)]
+pub fn pull_request_net_change(pull_request: &PullRequest) -> Option<i64> {
+    match (pull_request.additions, pull_request.deletions) {
+        (Some(a), Some(d)) => Some(a as i64 - d as i64),
+        (Some(a), None) => Some(a as i64),
+        (None, Some(d)) => Some(0 - d as i64),
+        _ => None,
+    }
+}
+
+#[allow(dead_code)]
+pub fn mean_net_change(
+    user: String,
+    pull_requests: Vec<PullRequest>,
+    terminal_state: PullRequestTerminatingState,
+) -> Option<f64> {
+    let users_prs: Vec<PullRequest> = pull_requests_by_author(user, pull_requests);
+    dbg!(&users_prs);
+
+    if users_prs.is_empty() {
+        None
+    } else {
+        Some(
+            users_prs
+                .iter()
+                .cloned()
+                .filter(|pr| pull_request_terminated(pr, terminal_state))
+                .filter_map(|pr| pull_request_net_change(&pr))
+                .map(|net_change| net_change as f64)
+                .sum::<f64>()
+                / users_prs.len() as f64,
+        )
     }
 }

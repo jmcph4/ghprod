@@ -26,6 +26,7 @@ pub async fn fetch_all_pull_requests(
         .per_page(MAX_NUM_PER_PAGE)
         .send()
         .await?;
+    prs.push(page.items.clone());
 
     loop {
         info!("Fetching page {}...", num_pages);
@@ -48,6 +49,8 @@ pub async fn fetch_all_pull_requests(
         debug!("Sleeping for {} milliseconds...", SLEEP_DURATION_MILLIS);
         tokio::time::sleep(tokio::time::Duration::from_millis(SLEEP_DURATION_MILLIS)).await;
     }
+
+    info!("Retrieved {} PRs", prs.len());
 
     Ok(prs.iter().flatten().cloned().collect())
 }
@@ -80,6 +83,7 @@ pub async fn solo(
                 Some(median_duration) => println!("{}", median_duration),
                 None => println!("(null)"),
             },
+            Metric::MeanNetChange => unimplemented!(),
         }
     } else {
         todo!()
