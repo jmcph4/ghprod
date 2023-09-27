@@ -1,13 +1,18 @@
+//! Implementations of the metrics used for reporting
 use std::str::FromStr;
 
 use chrono::{DateTime, Duration, Utc};
 use octocrab::models::pulls::PullRequest;
 
+use crate::api::pull_request_net_change;
+
+/// Represents a particular statistic
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Metric {
     MeanPrDuration,
     MedianPrDuration,
     MeanNetChange,
+    TotalPullRequests,
 }
 
 impl FromStr for Metric {
@@ -18,11 +23,17 @@ impl FromStr for Metric {
             "mean_pr_duration" => Ok(Self::MeanPrDuration),
             "median_pr_duration" => Ok(Self::MedianPrDuration),
             "mean_net_change" => Ok(Self::MeanNetChange),
+            "total_num_prs" => Ok(Self::TotalPullRequests),
             _ => Err("Unknown metric"),
         }
     }
 }
 
+/// Represents the state a PR is in iff. it is completed
+///
+/// Some projects have workflows such that a PR that successfully completes and
+/// ends up being integrated into the codebase may never be merged -- but
+/// rather closed. One example is the use of the Bors merge bot.
 #[derive(Copy, Clone, Debug)]
 #[allow(dead_code)]
 pub enum PullRequestTerminatingState {
@@ -52,6 +63,7 @@ impl FromStr for PullRequestTerminatingState {
     }
 }
 
+/// Determines whether `pull_request` has terminated (based on `terminal_state`)
 pub fn pull_request_terminated(
     pull_request: &PullRequest,
     terminal_state: PullRequestTerminatingState,
@@ -62,6 +74,9 @@ pub fn pull_request_terminated(
     }
 }
 
+/// Returns the length of time this PR took from its creation until its termination.
+///
+/// "Termination" here is defined by `pull_request_terminated`.
 pub fn pull_request_duration(
     pull_request: PullRequest,
     terminal_state: PullRequestTerminatingState,
@@ -79,6 +94,7 @@ pub fn pull_request_duration(
     end_time - start_time
 }
 
+/// Returns the subset of PRs that are authored by `author`
 pub fn pull_requests_by_author(author: &str, pull_requests: &Vec<PullRequest>) -> Vec<PullRequest> {
     pull_requests
         .iter()
@@ -87,8 +103,24 @@ pub fn pull_requests_by_author(author: &str, pull_requests: &Vec<PullRequest>) -
         .collect()
 }
 
+/// Returns the subset of PRs that have terminated
+pub fn terminated_pull_requests(
+    pull_requests: &Vec<PullRequest>,
+    terminal_state: PullRequestTerminatingState,
+) -> Vec<PullRequest> {
+    pull_requests
+        .iter()
+        .filter(|pr| pull_request_terminated(pr, terminal_state))
+        .cloned()
+        .collect()
+}
+
 pub const SECONDS_PER_DAY: u64 = 60 * 60 * 24;
 
+/// Returns the mean number of days a PR takes to terminate.
+///
+/// Note that non-terminated PRs (i.e., PRs that are still open) are ignored as
+/// part of this calculation.
 pub fn mean_pr_duration(
     user: &str,
     pull_requests: &Vec<PullRequest>,
@@ -112,6 +144,10 @@ pub fn mean_pr_duration(
     }
 }
 
+/// Returns the median number of days a PR takes to terminate.
+///
+/// Note that non-terminated PRs (i.e., PRs that are still open) are ignored as
+/// part of this calculation.
 pub fn median_pr_duration(
     user: &str,
     pull_requests: &Vec<PullRequest>,
@@ -137,16 +173,7 @@ pub fn median_pr_duration(
     }
 }
 
-#[allow(dead_code)]
-pub fn pull_request_net_change(pull_request: &PullRequest) -> Option<i64> {
-    match (pull_request.additions, pull_request.deletions) {
-        (Some(a), Some(d)) => Some(a as i64 - d as i64),
-        (Some(a), None) => Some(a as i64),
-        (None, Some(d)) => Some(0 - d as i64),
-        _ => None,
-    }
-}
-
+/// Returns the mean net change of the subset of `pull_requests` that are authored by `user`
 #[allow(dead_code)]
 pub fn mean_net_change(
     user: &str,
@@ -169,4 +196,9 @@ pub fn mean_net_change(
                 / users_prs.len() as f64,
         )
     }
+}
+
+/// Returns the number of PRs in `pull_requests` authored by `user`
+pub fn total_pull_requests(user: &str, pull_requests: &Vec<PullRequest>) -> usize {
+    pull_requests_by_author(user, pull_requests).len()
 }

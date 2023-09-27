@@ -9,6 +9,7 @@ use crate::{
     error::GhProdError,
 };
 
+mod api;
 mod cli;
 mod cmd;
 mod error;
