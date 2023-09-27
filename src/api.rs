@@ -21,7 +21,7 @@ pub const SECONDS_PER_MINUTE: u64 = 60;
 ///
 /// The current rate limits for *unauthenticated* requests are 60 requests per
 /// hour (obviously, this is one request per minute on average). Source:
-/// https://docs.github.com/en/rest/overview/resources-in-the-rest-api?apiVersion=2022-11-28#rate-limits-for-requests-from-personal-accounts
+/// [https://docs.github.com/en/rest/overview/resources-in-the-rest-api?apiVersion=2022-11-28#rate-limits-for-requests-from-personal-accounts](https://docs.github.com/en/rest/overview/resources-in-the-rest-api?apiVersion=2022-11-28#rate-limits-for-requests-from-personal-accounts)
 pub const SLEEP_DURATION_MILLIS: u64 = MILLISECONDS_PER_SECOND * SECONDS_PER_MINUTE;
 
 /// Maximum number of items to receive from the GitHub API per page.
