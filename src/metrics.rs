@@ -79,10 +79,7 @@ pub fn pull_request_duration(
     end_time - start_time
 }
 
-pub fn pull_requests_by_author(
-    author: String,
-    pull_requests: Vec<PullRequest>,
-) -> Vec<PullRequest> {
+pub fn pull_requests_by_author(author: &str, pull_requests: &Vec<PullRequest>) -> Vec<PullRequest> {
     pull_requests
         .iter()
         .filter(|pr| pr.user.as_ref().is_some_and(|user| user.login == author))
@@ -93,11 +90,11 @@ pub fn pull_requests_by_author(
 pub const SECONDS_PER_DAY: u64 = 60 * 60 * 24;
 
 pub fn mean_pr_duration(
-    user: String,
-    pull_requests: Vec<PullRequest>,
+    user: &str,
+    pull_requests: &Vec<PullRequest>,
     terminal_state: PullRequestTerminatingState,
 ) -> Option<f64> {
-    let users_prs: Vec<PullRequest> = pull_requests_by_author(user, pull_requests);
+    let users_prs: Vec<PullRequest> = pull_requests_by_author(user, &pull_requests);
 
     if users_prs.is_empty() {
         None
@@ -116,11 +113,11 @@ pub fn mean_pr_duration(
 }
 
 pub fn median_pr_duration(
-    user: String,
-    pull_requests: Vec<PullRequest>,
+    user: &str,
+    pull_requests: &Vec<PullRequest>,
     terminal_state: PullRequestTerminatingState,
 ) -> Option<f64> {
-    let durations: Vec<f64> = pull_requests_by_author(user, pull_requests)
+    let durations: Vec<f64> = pull_requests_by_author(user, &pull_requests)
         .iter()
         .cloned()
         .map(|pr| pull_request_duration(pr, terminal_state))
@@ -129,14 +126,14 @@ pub fn median_pr_duration(
         .collect();
     let n: usize = durations.len();
 
-    if n == 0 {
-        None
-    } else {
-        Some(if n % 2 == 0 {
+    match n {
+        0 => None,
+        1 => Some(durations[0]),
+        _ => Some(if n % 2 == 0 {
             (durations[n / 2] + durations[(n / 2) + 1]) / 2.0
         } else {
             durations[(n + 1) / 2]
-        })
+        }),
     }
 }
 
@@ -152,12 +149,11 @@ pub fn pull_request_net_change(pull_request: &PullRequest) -> Option<i64> {
 
 #[allow(dead_code)]
 pub fn mean_net_change(
-    user: String,
-    pull_requests: Vec<PullRequest>,
+    user: &str,
+    pull_requests: &Vec<PullRequest>,
     terminal_state: PullRequestTerminatingState,
 ) -> Option<f64> {
-    let users_prs: Vec<PullRequest> = pull_requests_by_author(user, pull_requests);
-    dbg!(&users_prs);
+    let users_prs: Vec<PullRequest> = pull_requests_by_author(user, &pull_requests);
 
     if users_prs.is_empty() {
         None

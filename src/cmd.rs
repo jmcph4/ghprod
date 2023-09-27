@@ -6,7 +6,10 @@ use octocrab::{models::pulls::PullRequest, Octocrab};
 use crate::{
     cli::{Opts, SoloOpts},
     error::GhProdError,
-    metrics::{mean_pr_duration, median_pr_duration, Metric, PullRequestTerminatingState},
+    metrics::{
+        mean_net_change, mean_pr_duration, median_pr_duration, pull_requests_by_author, Metric,
+        PullRequestTerminatingState,
+    },
 };
 
 pub const SLEEP_DURATION_MILLIS: u64 = 10;
@@ -55,6 +58,55 @@ pub async fn fetch_all_pull_requests(
     Ok(prs.iter().flatten().cloned().collect())
 }
 
+pub fn user_summary(
+    owner: &str,
+    repo: &str,
+    user: &str,
+    pull_requests: &Vec<PullRequest>,
+    terminal_state: PullRequestTerminatingState,
+) -> String {
+    let mut report: String = String::new();
+
+    report += format!("=== {}'s contributions to {}/{} ===\n", user, owner, repo).as_str();
+
+    let num_prs: usize = pull_requests_by_author(user, pull_requests).len();
+
+    if num_prs > 0 {
+        report += format!("{} has completed {} PRs\n", &user, num_prs).as_str();
+
+        if let Some(mean) = mean_pr_duration(user, pull_requests, terminal_state) {
+            report +=
+                format!("{}'s PRs take {} days to complete on average\n", user, mean).as_str();
+        }
+
+        if let Some(net_change) = mean_net_change(user, pull_requests, terminal_state) {
+            if net_change.is_sign_negative() {
+                report += format!(
+                    "{} reduces the size of the codebase by {} lines on average",
+                    user, net_change
+                )
+                .as_str()
+            } else if net_change.is_sign_positive() {
+                report += format!(
+                    "{} increases the size of the codebase by {} lines on average",
+                    user, net_change
+                )
+                .as_str()
+            } else {
+                report += format!(
+                    "{} doesn't change the size of the codebase on average!",
+                    user
+                )
+                .as_str()
+            };
+        }
+    } else {
+        report += "There's not much here...\n";
+    }
+
+    report
+}
+
 pub async fn solo(
     opts: SoloOpts,
     global_opts: Opts,
@@ -75,18 +127,31 @@ pub async fn solo(
 
     if let Some(metric) = opts.metric {
         match metric {
-            Metric::MeanPrDuration => match mean_pr_duration(user, prs, pr_terminal_state) {
-                Some(mean_duration) => println!("{}", mean_duration),
-                None => println!("(null)"),
-            },
-            Metric::MedianPrDuration => match median_pr_duration(user, prs, pr_terminal_state) {
-                Some(median_duration) => println!("{}", median_duration),
-                None => println!("(null)"),
-            },
+            Metric::MeanPrDuration => {
+                match mean_pr_duration(user.as_str(), &prs, pr_terminal_state) {
+                    Some(mean_duration) => println!("{}", mean_duration),
+                    None => println!("(null)"),
+                }
+            }
+            Metric::MedianPrDuration => {
+                match median_pr_duration(user.as_str(), &prs, pr_terminal_state) {
+                    Some(median_duration) => println!("{}", median_duration),
+                    None => println!("(null)"),
+                }
+            }
             Metric::MeanNetChange => unimplemented!(),
         }
     } else {
-        todo!()
+        println!(
+            "{}",
+            user_summary(
+                owner.as_str(),
+                repo.as_str(),
+                user.as_str(),
+                &prs,
+                pr_terminal_state
+            )
+        );
     }
 
     Ok(())
